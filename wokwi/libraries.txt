@@ -1,0 +1,16 @@
+# Arduino Libraries for IoT Smart Lights
+# Add these via Library Manager (+) in Wokwi
+
+# MQTT Client
+PubSubClient
+
+# JSON Parser
+ArduinoJson
+
+# ThingSpeak - Data logging & monitoring
+ThingSpeak
+
+# Built-in libraries (không cần cài đặt):
+# - WiFi.h (ESP32 built-in)
+# - WiFiClientSecure.h (ESP32 built-in)
+# - time.h (C standard library)

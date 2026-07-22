@@ -1,0 +1,76 @@
+# ==================== Environment Variables ====================
+.env
+.env.local
+.env.*.local
+
+# ==================== Wokwi Firmware Secrets ====================
+wokwi/include/secrets.h
+
+# ==================== MQTT Credentials ====================
+# Deprecated - use .env instead
+Credentials_HiveMQ.txt
+
+# ==================== OS Files ====================
+.DS_Store
+Thumbs.db
+
+# ==================== Editor Files ====================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ==================== Node.js / NPM ====================
+node_modules/
+package-lock.json
+
+# NPM Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ==================== Build Outputs ====================
+dist/
+dist-ssr/
+build/
+coverage/
+logs/
+
+# ==================== PlatformIO (wokwi/) ====================
+# Build & Cache
+.pio/
+pio.local.ini
+
+# IntelliSense (VSCode)
+.vscode/.browse.c_cpp.db*
+.vscode/c_cpp_properties.json
+.vscode/launch.json
+.vscode/ipch
+
+# Dependencies
+.pio/libdeps/
+
+# Debug
+*.log
+*.pyc
+
+# ==================== Local Files ====================
+*.local
+
+# ==================== Plan Documents ====================
+# Temporary planning documents
+PLAN_*.md
+WOKWI_*.md
+image.png
+
+# Duplicate rule cleanup
+Credentials_HiveMQ.txt
+Credentials_EMQX.txt

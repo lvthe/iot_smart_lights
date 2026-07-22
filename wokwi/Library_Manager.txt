@@ -1,0 +1,32 @@
+# Tab Library Manager - Wokwi
+# List of libraries needed for IoT Smart Lights project
+
+=== Required Libraries ===
+
+1. PubSubClient
+   - For MQTT communication
+   - Version: 2.8.0 or later
+   - Author: Nick O'Leary
+
+2. ArduinoJson
+   - For JSON parsing MQTT messages
+   - Version: 6.21.0 or later
+   - Author: Benoit Blanchon
+
+3. FastLED
+   - For RGB LED control (WS2812B, NeoPixel)
+   - Version: 3.6.0 or later
+   - Author: Daniel Garcia
+
+=== Built-in Libraries ===
+
+- WiFi (ESP32 core)
+- HTTP (ESP32 core)
+
+=== How to Add in Wokwi ===
+
+1. Click (+) button near "Libraries"
+2. Search for library name
+3. Click "Add" to include in project
+
+Or copy from tab_libraries.txt

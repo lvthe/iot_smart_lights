@@ -1,0 +1,46 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "🔍 Checking for unused variables..."
+cd web-client
+npx lint-staged
+
+# Check exit code
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "❌ Lint failed! Please fix the issues before committing."
+  echo "💡 Tip: Use 'npm run lint:fix' to auto-fix some issues"
+  echo "💡 Or use 'git commit --no-verify' to skip lint (not recommended)"
+  exit 1
+fi
+
+echo "✅ Lint passed!"
+
+echo "🧪 Running tests before commit..."
+npm run test:run
+
+# Check exit code
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "❌ Tests failed! Commit aborted."
+  echo "💡 Tip: Use 'git commit --no-verify' to skip tests (not recommended)"
+  exit 1
+fi
+
+echo "✅ Tests passed! Proceeding with commit..."
+
+# Check MQTT State Mode
+echo "🔍 Checking MQTT State Mode..."
+ENV_FILE="../.env"
+
+if [ -f "$ENV_FILE" ]; then
+  if grep -q "VITE_IS_USING_MQTT_STATE=false" "$ENV_FILE"; then
+    echo ""
+    echo "⚠️  WARNING: VITE_IS_USING_MQTT_STATE is set to false"
+    echo "🔄 Auto-resetting to true for commit..."
+    # Use perl for Windows compatibility (sed -i behaves differently on Windows)
+    perl -i -pe 's/VITE_IS_USING_MQTT_STATE=false/VITE_IS_USING_MQTT_STATE=true/' "$ENV_FILE"
+    git add "$ENV_FILE"
+    echo "✅ VITE_IS_USING_MQTT_STATE reset to true"
+  fi
+fi
