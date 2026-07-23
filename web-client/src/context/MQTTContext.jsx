@@ -33,6 +33,7 @@ export const MQTTProvider = ({ children }) => {
   const [onlineDevices, setOnlineDevices] = useState(new Set());
   const [logs, setLogs] = useState([]);
   const [pendingStates, setPendingStates] = useState(new Set()); // Devices waiting for MQTT response
+  const [sensorData, setSensorData] = useState(null); // [F1] { temperature, humidity, updatedAt }
 
   const mqttClient = useRef(null);
   const lastSeenTime = useRef({});
@@ -310,6 +311,19 @@ export const MQTTProvider = ({ children }) => {
     console.log(`📥 [MQTT RECEIVE] ${receiveTime.toFixed(0)}ms | Topic:`, topic, 'Payload:', payload);
     addLog('status', topic, payload);
 
+    // [F1] Message cảm biến DHT22 (nhiệt độ/độ ẩm) - topic riêng, không có light_id
+    if (topic === TOPICS.sensor) {
+      try {
+        const s = JSON.parse(payload);
+        if (typeof s.temperature === 'number' && typeof s.humidity === 'number') {
+          setSensorData({ temperature: s.temperature, humidity: s.humidity, updatedAt: Date.now() });
+        }
+      } catch (e) {
+        console.error('Error parsing sensor message:', e);
+      }
+      return;
+    }
+
     // Parse payload to get light_id
     try {
       const data = JSON.parse(payload);
@@ -383,16 +397,20 @@ export const MQTTProvider = ({ children }) => {
         setIsConnected(true);
         updateBrokerStatus('connected');
 
-        // Subscribe to single status topic
+        // Subscribe to status + sensor topics
         client.subscribe(TOPICS.status);
-        console.log('✅ Subscribed to:', TOPICS.status);
+        client.subscribe(TOPICS.sensor); // [F1] nhiệt độ/độ ẩm DHT22
+        console.log('✅ Subscribed to:', TOPICS.status, TOPICS.sensor);
 
         const now = Date.now();
-        // Set all devices as online (optimistic) and pending
+        // Optimistic online + ghi lastSeenTime. KHÔNG setDevicePending ở đây:
+        // ESP32 broadcast status theo lịch riêng (mỗi STATUS_BROADCAST_INTERVAL),
+        // nên áp timeout 5s ngay lúc mới kết nối sẽ khiến cả 6 đèn báo "mất phản hồi"
+        // trước khi broadcast đầu tiên kịp tới -> chập chờn. Thay vào đó để
+        // DEVICE_RESPONSE_TIMEOUT (40s) + broadcast định kỳ tự đồng bộ.
         getDeviceIds().forEach(lightId => {
           lastSeenTime.current[lightId] = now;
           updateDeviceCardStatus(lightId, true);
-          setDevicePending(lightId);
         });
 
         addLog('system', '-', 'Đã kết nối đến EMQX Broker');
@@ -415,7 +433,7 @@ export const MQTTProvider = ({ children }) => {
       console.error('Connection error:', e);
       addLog('system', '-', 'Lỗi kết nối: ' + e.message);
     }
-  }, [onConnectionLost, onMessageArrived, updateBrokerStatus, addLog, setDevicePending, updateDeviceCardStatus]);
+  }, [onConnectionLost, onMessageArrived, updateBrokerStatus, addLog, updateDeviceCardStatus]);
 
   // Start device timeout check
   const startDeviceTimeoutCheck = useCallback(() => {
@@ -516,6 +534,7 @@ export const MQTTProvider = ({ children }) => {
     onlineDevices,
     logs,
     pendingStates,
+    sensorData,
     publishControl,
     addLog,
     updateDeviceState,
@@ -527,6 +546,7 @@ export const MQTTProvider = ({ children }) => {
     onlineDevices,
     logs,
     pendingStates,
+    sensorData,
     publishControl,
     addLog,
     updateDeviceState,

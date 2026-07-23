@@ -39,6 +39,7 @@
 #include <ArduinoJson.h>
 #include <time.h>
 #include <ThingSpeak.h>
+#include <DHT.h> // [F1] Cảm biến nhiệt độ/độ ẩm DHT22 (thư viện Adafruit, hợp Wokwi)
 #include "secrets.h" // MQTT_BROKER, MQTT_PORT, MQTT_USER, MQTT_PASSWORD, THINGSPEAK_* (gitignored, xem secrets.h.example)
 
 // ==================== WiFi Credentials ====================
@@ -105,13 +106,14 @@ const unsigned long WIFI_CONNECT_TIMEOUT_MS = 30000;    // timeout kết nối W
 const unsigned long WIFI_STATUS_LOG_INTERVAL_MS = 3000; // in log status WiFi mỗi 3s
 const unsigned long MQTT_CONNECT_TIMEOUT_MS = 30000;    // timeout kết nối MQTT (30s)
 const unsigned long MQTT_RETRY_DELAY_MS = 5000;         // chờ giữa 2 lần thử lại MQTT
-const unsigned long STATUS_BROADCAST_INTERVAL = 30000;  // 30 seconds - gửi status định kỳ
+const unsigned long STATUS_BROADCAST_INTERVAL = 15000;  // 15s - gửi status định kỳ (nhỏ hơn 1/2 DEVICE_RESPONSE_TIMEOUT của web=40s để đồng bộ ổn định, chịu được 1 lần rớt gói)
 // LƯU Ý: KHÔNG hạ MQTT_RETRY_DELAY_MS xuống quá thấp (vd < 1000ms). EMQX Cloud
 // cũng có rate-limit số lần kết nối; reconnect dồn dập có thể bị chặn tạm thời.
 
 // ==================== MQTT Topics (CHUNG cho tất cả đèn) ====================
 const char *CONTROL_TOPIC = "esp32/control"; // Web -> ESP (subscribe)
 const char *STATUS_TOPIC = "esp32/status";   // ESP -> Web (publish)
+const char *SENSOR_TOPIC = "esp32/sensor";   // [F1] ESP -> Web: nhiệt độ/độ ẩm DHT22
 
 // ==================== Light IDs (HỢP ĐỒNG với Web client) ====================
 // Web phải gửi đúng các "light_id" này trong body; ESP cũng trả lại trong status.
@@ -177,6 +179,33 @@ unsigned long lastCountdownPrint = 0;
 // ==================== Status Broadcast State ====================
 unsigned long lastStatusBroadcast = 0;
 
+// ==================== [F1] DHT22 Sensor ====================
+// GPIO 15: chân xuất/nhập được (KHÔNG dùng GPIO 34-39 vì input-only,
+// DHT cần giao tiếp 2 chiều nên phải chọn chân output-capable).
+#define DHT_PIN 15
+#define DHT_TYPE DHT22
+DHT dht(DHT_PIN, DHT_TYPE);
+const unsigned long DHT_READ_INTERVAL = 5000; // đọc mỗi 5s (DHT22 tối đa ~0.5Hz)
+unsigned long lastDHTRead = 0;
+
+// ==================== [F2] Schedule (Hẹn giờ tự bật/tắt đèn) ====================
+struct Schedule {
+  int roomIndex;          // đèn nào (0..5)
+  int onHour, onMinute;   // giờ bật
+  int offHour, offMinute; // giờ tắt
+  bool enabled;
+};
+
+// Ví dụ: đèn phòng khách bật 18:00 tắt 23:00; đèn bếp bật 17:30 tắt 22:00
+Schedule schedules[] = {
+    {0, 18, 0, 23, 0, true}, // living_main
+    {4, 17, 30, 22, 0, true} // kitchen
+};
+const int SCHEDULE_COUNT = sizeof(schedules) / sizeof(schedules[0]);
+const unsigned long SCHEDULE_CHECK_INTERVAL = 30000; // kiểm tra mỗi 30s
+unsigned long lastScheduleCheck = 0;
+int lastHandledMinute = -1; // tránh kích hoạt lặp trong cùng 1 phút
+
 // ==================== Pending Status Publish (Deferred from Callback) ====================
 // KHÔNG gọi mqtt.publish() trong callback() để tránh reentrancy crash
 // Thay vào đó set flag = true và publish trong loop()
@@ -214,6 +243,10 @@ void updateAllLEDs();
 bool hasThingSpeakStateChanged(int roomIndex);
 void updateLastState(int roomIndex);
 void uploadToThingSpeak();
+
+// [F1] DHT22 & [F2] Schedule functions
+void readAndPublishDHT();
+void checkSchedules();
 
 // ==================== ThingSpeak Helper Functions ====================
 bool hasThingSpeakStateChanged(int roomIndex) {
@@ -308,6 +341,10 @@ void setup() {
   // ThingSpeak initialization
   ThingSpeak.begin(thingspeakClient);
   LOG("ThingSpeak initialized");
+
+  // [F1] DHT22 initialization
+  dht.begin();
+  LOG("DHT22 initialized on GPIO " + String(DHT_PIN));
 
   LOG("Setup complete!");
 }
@@ -416,7 +453,86 @@ void loop() {
     }
   }
 
+  // ===== [F1] Đọc DHT22 & publish (mỗi 5s) =====
+  if (millis() - lastDHTRead >= DHT_READ_INTERVAL) {
+    lastDHTRead = millis();
+    readAndPublishDHT();
+  }
+
+  // ===== [F2] Kiểm tra lịch hẹn giờ (mỗi 30s) =====
+  if (millis() - lastScheduleCheck >= SCHEDULE_CHECK_INTERVAL) {
+    lastScheduleCheck = millis();
+    checkSchedules();
+  }
+
   delay(LOOP_DELAY_MS);
+}
+
+// ==================== [F1] Đọc & publish DHT22 ====================
+void readAndPublishDHT() {
+  float temperature = dht.readTemperature(); // °C
+  float humidity = dht.readHumidity();       // %
+
+  // readTemperature/readHumidity trả về NaN nếu đọc lỗi
+  if (isnan(temperature) || isnan(humidity)) {
+    LOG("[DHT22] Read error (NaN)");
+    return;
+  }
+
+  JsonDocument doc;
+  doc["temperature"] = temperature;
+  doc["humidity"] = humidity;
+
+  String output;
+  serializeJson(doc, output);
+
+  if (mqtt.connected()) {
+    mqtt.publish(SENSOR_TOPIC, output.c_str());
+    mqtt.loop(); // xử lý gói inbound sau khi publish
+  }
+  LOG("[DHT22] Temp=" + String(temperature, 1) + "C Humidity=" + String(humidity, 1) + "% -> " +
+      output);
+}
+
+// ==================== [F2] Kiểm tra & thực thi lịch hẹn giờ ====================
+void checkSchedules() {
+  time_t now = time(nullptr);
+  if (now < 100000)
+    return; // NTP chưa sync -> chưa có giờ thực, bỏ qua
+
+  struct tm t;
+  localtime_r(&now, &t);
+  int curH = t.tm_hour;
+  int curM = t.tm_min;
+
+  // Chỉ xử lý 1 lần mỗi phút (tránh bật/tắt lặp trong cùng phút)
+  if (curM == lastHandledMinute)
+    return;
+  lastHandledMinute = curM;
+
+  for (int i = 0; i < SCHEDULE_COUNT; i++) {
+    Schedule &s = schedules[i];
+    if (!s.enabled)
+      continue;
+
+    // Đến giờ BẬT
+    if (curH == s.onHour && curM == s.onMinute && !rgbStates[s.roomIndex].power) {
+      setPower(s.roomIndex, true);
+      updateRGBLED(s.roomIndex);
+      pendingStatusPublish[s.roomIndex] = true; // báo web
+      LOG("[SCHEDULE] Auto ON " + String(ROOM_NAMES[s.roomIndex]) + " luc " + String(curH) + ":" +
+          String(curM));
+    }
+
+    // Đến giờ TẮT
+    if (curH == s.offHour && curM == s.offMinute && rgbStates[s.roomIndex].power) {
+      setPower(s.roomIndex, false);
+      updateRGBLED(s.roomIndex);
+      pendingStatusPublish[s.roomIndex] = true;
+      LOG("[SCHEDULE] Auto OFF " + String(ROOM_NAMES[s.roomIndex]) + " luc " + String(curH) + ":" +
+          String(curM));
+    }
+  }
 }
 
 // ==================== WiFi Setup ====================

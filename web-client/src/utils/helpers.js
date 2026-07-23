@@ -67,39 +67,42 @@ export const formatTime = (totalMinutes) => {
 
 // ===== ThingSpeak Data Helpers =====
 
+// Ngưỡng "khoảng trống dữ liệu": nếu 2 bản ghi ThingSpeak liên tiếp cách nhau
+// hơn số phút này, coi như dữ liệu bị ngắt quãng (sim tắt, mất mạng, hoặc là
+// bản ghi cũ từ phiên chạy trước) và KHÔNG cộng dồn cả khoảng đó -> tránh
+// phóng đại thời gian sử dụng (VD trước đây ra 771 giờ do 1 gap nhiều ngày).
+const MAX_GAP_MINUTES = 60;
+
 /**
- * Calculate light usage time from ThingSpeak feeds
+ * Calculate light usage time from ThingSpeak feeds.
+ *
+ * ThingSpeak chỉ được ESP32 upload KHI có thay đổi trạng thái (on-change), nên
+ * các bản ghi thưa. Hàm tính tổng thời gian đèn ON bằng cách cộng khoảng cách
+ * giữa các bản ghi liên tiếp mà bản ghi trước đó đang ON. Mỗi khoảng được giới
+ * hạn ở MAX_GAP_MINUTES để một "khoảng trống" bất thường không làm sai số liệu.
+ *
  * @param {Array} feeds - Array of feed entries from ThingSpeak
  * @param {string} fieldNumber - Field to check (e.g., 'field1', 'field2')
- * @returns {number} Total minutes the light was ON
+ * @returns {number} Total minutes the light was ON (đã lọc gap bất thường)
  */
 export const calculateLightUsage = (feeds, fieldNumber) => {
-  if (!feeds || feeds.length === 0) return 0;
+  if (!feeds || feeds.length < 2) return 0;
 
   let totalMinutes = 0;
-  let lastOnTime = null;
-  let lastState = 0;
 
-  feeds.forEach((feed) => {
-    const state = feed[fieldNumber] === '1' ? 1 : 0;
-    const timestamp = new Date(feed.created_at);
+  for (let i = 0; i < feeds.length - 1; i++) {
+    const isOn = feeds[i][fieldNumber] === '1';
+    if (!isOn) continue; // chỉ tính khoảng mà đèn đang bật
 
-    if (state === 1 && lastState === 0) {
-      // Light turned ON
-      lastOnTime = timestamp;
-    } else if (state === 0 && lastState === 1 && lastOnTime) {
-      // Light turned OFF - calculate duration
-      const minutes = (timestamp - lastOnTime) / 60000;
-      totalMinutes += minutes;
-      lastOnTime = null;
-    }
+    const t1 = new Date(feeds[i].created_at);
+    const t2 = new Date(feeds[i + 1].created_at);
+    const gapMinutes = (t2 - t1) / 60000;
 
-    lastState = state;
-  });
+    if (gapMinutes <= 0) continue;
 
-  // If light is still ON, count time until now
-  if (lastState === 1 && lastOnTime) {
-    totalMinutes += (new Date() - lastOnTime) / 60000;
+    // Khoảng bình thường -> cộng đủ; khoảng quá lớn -> chặn ở ngưỡng để
+    // không cộng nhầm thời gian sim đã tắt.
+    totalMinutes += Math.min(gapMinutes, MAX_GAP_MINUTES);
   }
 
   return totalMinutes;

@@ -155,6 +155,65 @@
     animation: fadeIn 0.3s ease-in-out;
 }
 
+/* [W2] Thanh xuất CSV + chọn số bản ghi */
+.export-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin: 16px 0;
+}
+
+.export-limit {
+    font-size: 0.9rem;
+    color: var(--text-dim);
+}
+
+.export-limit select {
+    margin-left: 6px;
+    padding: 6px 10px;
+    border-radius: 6px;
+}
+
+.export-btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    background: #4fffa3;
+    color: #04331f;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.export-btn:hover {
+    filter: brightness(1.05);
+}
+
+/* [W1] Biểu đồ trực quan */
+.usage-chart {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 24px;
+    margin: 24px 0;
+}
+
+.usage-chart-box {
+    position: relative;
+    height: 300px;
+    padding: 12px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.usage-chart-empty {
+    margin: 24px 0;
+    padding: 24px;
+    text-align: center;
+    color: var(--text-dim);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.03);
+}
+
 .usage-summary {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -336,6 +395,22 @@ body {
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+}
+
+/* [F1] Hiển thị nhiệt độ/độ ẩm DHT22 */
+.sensor-display {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    padding: 8px 16px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.sensor-item {
+    font-size: 1.1rem;
+    font-weight: 600;
+    white-space: nowrap;
 }
 
 /* Mode Badge */

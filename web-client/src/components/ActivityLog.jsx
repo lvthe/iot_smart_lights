@@ -6,11 +6,14 @@ import React, { useState, useEffect } from 'react';
 import THINGSPEAK_CONFIG from '@/configs/thingspeak.config';
 import { DEVICES } from '@/utils/data.js';
 import { formatTime, calculateLightUsage } from '@/utils/helpers.js';
+import UsageChart from './UsageChart';
+import ExportBar from './ExportBar';
 
 function ActivityLog() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [resultsLimit, setResultsLimit] = useState(THINGSPEAK_CONFIG.results);
 
   const fetchData = async () => {
     setLoading(true);
@@ -25,7 +28,7 @@ function ActivityLog() {
         THINGSPEAK_CONFIG.url(
           THINGSPEAK_CONFIG.channelId,
           THINGSPEAK_CONFIG.readApiKey,
-          THINGSPEAK_CONFIG.results
+          resultsLimit
         )
       );
 
@@ -59,7 +62,7 @@ function ActivityLog() {
           THINGSPEAK_CONFIG.url(
             THINGSPEAK_CONFIG.channelId,
             THINGSPEAK_CONFIG.readApiKey,
-            THINGSPEAK_CONFIG.results
+            resultsLimit
           )
         );
 
@@ -88,7 +91,7 @@ function ActivityLog() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [resultsLimit]);
 
   // Error state
   if (error) {
@@ -160,6 +163,16 @@ function ActivityLog() {
               >
                 🔄 {loading ? 'Đang tải...' : 'Làm mới'}
               </button>
+
+              {/* [W2] Thanh xuất CSV + chọn số bản ghi */}
+              <ExportBar
+                feeds={data.feeds}
+                resultsLimit={resultsLimit}
+                onLimitChange={setResultsLimit}
+              />
+
+              {/* [W1] Biểu đồ trực quan */}
+              <UsageChart stats={stats} totalAllLights={totalAllLights} />
 
               {/* Table */}
               <table className="usage-table">

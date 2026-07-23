@@ -189,6 +189,13 @@
       "attrs": { "label": "Bathroom PIR" }
     },
     {
+      "type": "wokwi-dht22",
+      "id": "dht_livingroom",
+      "top": 300,
+      "left": -1050,
+      "attrs": { "label": "Temp/Humidity" }
+    },
+    {
       "type": "wokwi-text",
       "id": "txt_living_room",
       "top": 556.8,
@@ -246,6 +253,9 @@
     [ "pir_bathroom:GND", "esp32:GND.1", "black", [ "v-19.2", "h-57.34", "v-115.2" ] ],
     [ "pir_bathroom:VCC", "esp32:3V3", "magenta", [ "v-9.6", "h-86.4", "v-249.6" ] ],
     [ "pir_bathroom:OUT", "esp32:35", "yellow", [ "v-28.8", "h-57.46", "v-96" ] ],
+    [ "dht_livingroom:VCC", "esp32:3V3", "red", [ "h0" ] ],
+    [ "dht_livingroom:GND", "esp32:GND.1", "black", [ "h0" ] ],
+    [ "dht_livingroom:SDA", "esp32:15", "green", [ "h0" ] ],
     [ "r_living_room_red:1", "esp32:25", "red", [ "v38.4", "h-259.2", "v-307.2" ] ],
     [ "r_living_room_green:1", "esp32:13", "green", [ "v19.2", "h-259.2", "v-230.4" ] ],
     [ "r_living_room_blue:1", "esp32:26", "blue", [ "v28.8", "h-288", "v-288" ] ],
